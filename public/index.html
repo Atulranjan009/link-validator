@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Automated Broken Link Validator</title>
+
+<link rel="stylesheet" href="/styles.css">
+
+</head>
+
+<body>
+
+<div class="app">
+
+<!-- =====================================================
+     HEADER
+     ===================================================== -->
+
+<header class="header">
+
+    <div>
+
+        <h1>
+            Automated Broken Link Validator
+        </h1>
+
+        <p>
+            Scan sitemap pages and automatically detect
+            broken internal and external links.
+        </p>
+
+    </div>
+
+</header>
+
+
+<!-- =====================================================
+     SITEMAP SCANNER
+     ===================================================== -->
+
+<section class="card scanner-card">
+
+    <h2>
+        Sitemap Scanner
+    </h2>
+
+    <p class="description">
+        Enter your sitemap URL to start scanning.
+    </p>
+
+
+    <div class="input-group">
+
+        <label for="sitemapUrl">
+            Sitemap URL
+        </label>
+
+
+        <div class="input-row">
+
+            <input
+                id="sitemapUrl"
+                type="text"
+                value="https://www.genmab.com/sitemap-view-1.xml"
+                placeholder="Enter sitemap URL"
+            >
+
+
+            <button
+                id="startScan"
+                onclick="startScan()"
+            >
+                Start Scan
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <!-- =================================================
+         SCAN STATUS
+         ================================================= -->
+
+    <div
+        id="scanStatus"
+        class="scan-status"
+    ></div>
+
+</section>
+
+
+<!-- =====================================================
+     DASHBOARD
+     ===================================================== -->
+
+<section
+    id="dashboard"
+    class="dashboard hidden"
+>
+
+
+    <!-- =================================================
+         STATISTICS
+         ================================================= -->
+
+    <div class="stats-grid">
+
+
+        <!-- Pages Found -->
+
+        <div class="stat-card">
+
+            <span>
+                Pages Found
+            </span>
+
+            <strong id="pagesFound">
+                0
+            </strong>
+
+        </div>
+
+
+        <!-- Pages Scanned -->
+
+        <div class="stat-card">
+
+            <span>
+                Pages Scanned
+            </span>
+
+            <strong id="pagesScanned">
+                0
+            </strong>
+
+        </div>
+
+
+        <!-- Links Discovered -->
+
+        <div class="stat-card">
+
+            <span>
+                Links Discovered
+            </span>
+
+            <strong id="linksDiscovered">
+                0
+            </strong>
+
+        </div>
+
+
+        <!-- Unique Links -->
+
+        <div class="stat-card">
+
+            <span>
+                Unique Links
+            </span>
+
+            <strong id="uniqueLinks">
+                0
+            </strong>
+
+        </div>
+
+
+        <!-- Valid -->
+
+        <div class="stat-card valid">
+
+            <span>
+                Valid
+            </span>
+
+            <strong id="validLinks">
+                0
+            </strong>
+
+        </div>
+
+
+        <!-- Redirects -->
+
+        <div class="stat-card redirect">
+
+            <span>
+                Redirects
+            </span>
+
+            <strong id="redirectLinks">
+                0
+            </strong>
+
+        </div>
+
+
+        <!-- Broken -->
+
+        <div class="stat-card broken">
+
+            <span>
+                Broken
+            </span>
+
+            <strong id="brokenLinks">
+                0
+            </strong>
+
+        </div>
+
+
+        <!-- Errors -->
+
+        <div class="stat-card error">
+
+            <span>
+                Errors
+            </span>
+
+            <strong id="errorLinks">
+                0
+            </strong>
+
+        </div>
+
+    </div>
+
+
+    <!-- =================================================
+         RESULTS
+         ================================================= -->
+
+    <div class="card results-card">
+
+
+        <!-- Results Header -->
+
+        <div class="results-header">
+
+
+            <div>
+
+                <h2>
+                    Link Validation Results
+                </h2>
+
+                <p>
+                    Every discovered anchor is mapped
+                    back to its source page.
+                </p>
+
+            </div>
+
+
+            <!-- =================================================
+                 ACTIONS
+                 ================================================= -->
+
+            <div class="actions">
+
+
+                <!-- STATUS FILTER -->
+
+                <select id="statusFilter">
+
+                    <option value="all">
+                        All Links
+                    </option>
+
+
+                    <option value="broken">
+                        Broken
+                    </option>
+
+
+                    <option value="redirect">
+                        Redirects
+                    </option>
+
+
+                    <option value="valid">
+                        Valid
+                    </option>
+
+
+                    <option value="access_restricted">
+                        Access Restricted
+                    </option>
+
+
+                    <option value="server_error">
+                        Server Errors
+                    </option>
+
+
+                    <!--
+                         IMPORTANT:
+                         "error" is handled specially
+                         in app.js.
+
+                         It includes:
+                         - access_restricted
+                         - server_error
+                         - unable_to_validate
+                    -->
+
+                    <option value="error">
+                        Errors
+                    </option>
+
+                </select>
+
+
+                <!-- CSV -->
+
+                <button
+                    class="secondary-button"
+                    onclick="downloadCSV()"
+                >
+                    Export CSV
+                </button>
+
+            </div>
+
+        </div>
+
+
+        <!-- =================================================
+             RESULTS TABLE
+             ================================================= -->
+
+        <div class="table-container">
+
+            <table>
+
+                <thead>
+
+                    <tr>
+
+                        <th>
+                            Source Page
+                        </th>
+
+
+                        <th>
+                            Anchor Text
+                        </th>
+
+
+                        <th>
+                            Target URL
+                        </th>
+
+
+                        <th>
+                            Type
+                        </th>
+
+
+                        <th>
+                            Status
+                        </th>
+
+
+                        <th>
+                            Response
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody id="resultsTable">
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</section>
+
+</div>
+
+<!-- =========================================================
+     JAVASCRIPT
+     ========================================================= -->
+
+<script src="/app.js"></script>
+
+</body>
+
+</html>

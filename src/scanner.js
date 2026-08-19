@@ -428,6 +428,151 @@ async function extractAnchors(page) {
 
 /*
 =========================================================
+ANCHOR SNAPSHOT
+=========================================================
+
+The previous implementation waited only for a fixed
+render delay. That can miss dynamically populated hrefs.
+
+This snapshot captures the actual anchor state:
+- href
+- anchor text
+
+The scan waits until that state is stable across
+multiple checks.
+=========================================================
+*/
+
+async function getAnchorSnapshot(page) {
+
+    try {
+
+        return await page
+            .locator("a")
+            .evaluateAll(
+                anchors => {
+
+                    return anchors.map(
+                        anchor => ({
+
+                            href:
+                                anchor.getAttribute(
+                                    "href"
+                                ),
+
+                            text:
+                                (
+                                    anchor.innerText ||
+                                    anchor.textContent ||
+                                    ""
+                                )
+                                    .replace(
+                                        /\s+/g,
+                                        " "
+                                    )
+                                    .trim()
+
+                        })
+                    );
+
+                }
+            );
+
+    } catch {
+
+        return [];
+    }
+}
+
+
+/*
+=========================================================
+WAIT FOR DYNAMIC ANCHORS TO SETTLE
+=========================================================
+*/
+
+async function waitForAnchorsToSettle(page) {
+
+    const MAX_WAIT =
+        7000;
+
+    const CHECK_INTERVAL =
+        400;
+
+    const REQUIRED_STABLE_CHECKS =
+        3;
+
+
+    const started =
+        Date.now();
+
+
+    let previousSnapshot =
+        null;
+
+
+    let stableChecks =
+        0;
+
+
+    while (
+        Date.now() - started <
+        MAX_WAIT
+    ) {
+
+        const currentSnapshot =
+            await getAnchorSnapshot(
+                page
+            );
+
+
+        const currentSerialized =
+            JSON.stringify(
+                currentSnapshot
+            );
+
+
+        if (
+            currentSerialized ===
+            previousSnapshot
+        ) {
+
+            stableChecks++;
+
+        } else {
+
+            stableChecks =
+                0;
+        }
+
+
+        previousSnapshot =
+            currentSerialized;
+
+
+        /*
+         * Anchor collection and href values have
+         * remained unchanged across several checks.
+         */
+
+        if (
+            stableChecks >=
+            REQUIRED_STABLE_CHECKS
+        ) {
+
+            return;
+        }
+
+
+        await page.waitForTimeout(
+            CHECK_INTERVAL
+        );
+    }
+}
+
+
+/*
+=========================================================
 SCAN PAGE
 =========================================================
 */
@@ -471,6 +616,20 @@ async function scanPage(
 
         await page.waitForTimeout(
             RENDER_WAIT
+        );
+
+
+        /*
+         * NEW:
+         *
+         * Wait for actual anchor data to settle.
+         *
+         * This is intentionally done immediately
+         * before extractAnchors().
+         */
+
+        await waitForAnchorsToSettle(
+            page
         );
 
 
@@ -1609,7 +1768,6 @@ async function runConcurrent(
 
 
     await Promise.all(
-
         Array.from(
             {
                 length:
@@ -1662,6 +1820,7 @@ async function runScan({
                 "--disable-setuid-sandbox",
                 "--disable-dev-shm-usage"
             ]
+
         });
 
 
@@ -1680,6 +1839,7 @@ async function runScan({
 
                 percent:
                     5
+
             });
         }
 
@@ -1725,19 +1885,14 @@ async function runScan({
 
                 percent:
                     10
+
             });
         }
 
 
         /*
          * SCAN ALL PAGES
-         */
-
-        let pagesCompleted =
-            0;
-
-
-        /*
+         *
          * IMPORTANT:
          *
          * Do not reference "pages"
@@ -1746,6 +1901,10 @@ async function runScan({
          * That was causing the
          * page.anchors / TDZ issues.
          */
+
+        let pagesCompleted =
+            0;
+
 
         const pages =
             await runConcurrent(
@@ -1775,12 +1934,15 @@ async function runScan({
                             pageUrls.length > 0
 
                                 ? Math.round(
+
                                     10 +
+
                                     (
                                         pagesCompleted /
                                         pageUrls.length
                                     ) *
                                     40
+
                                 )
 
                                 : 50;
@@ -1818,6 +1980,7 @@ async function runScan({
                 },
 
                 4
+
             );
 
 
@@ -1835,10 +1998,6 @@ async function runScan({
 
             /*
              * Safety check.
-             *
-             * Prevent:
-             *
-             * page.anchors is not iterable
              */
 
             if (
@@ -1886,8 +2045,11 @@ async function runScan({
                     forceBroken:
                         anchor.forceBroken ||
                         false
+
                 });
+
             }
+
         }
 
 
@@ -1896,12 +2058,18 @@ async function runScan({
          */
 
         const uniqueUrls = [
+
             ...new Set(
+
                 discovered.map(
+
                     item =>
                         item.targetUrl
+
                 )
+
             )
+
         ];
 
 
@@ -1939,7 +2107,9 @@ async function runScan({
 
                 percent:
                     50
+
             });
+
         }
 
 
@@ -1970,9 +2140,11 @@ async function runScan({
 
                 const matchingItem =
                     discovered.find(
+
                         item =>
                             item.targetUrl ===
                             url
+
                     );
 
 
@@ -1981,8 +2153,11 @@ async function runScan({
                  */
 
                 if (
+
                     matchingItem &&
+
                     matchingItem.forceBroken
+
                 ) {
 
                     result = {
@@ -2010,6 +2185,7 @@ async function runScan({
                                 ? 'Invalid href detected: href="undefined"'
 
                                 : "Invalid href detected"
+
                     };
 
 
@@ -2025,6 +2201,7 @@ async function runScan({
                             browser,
                             url
                         );
+
                 }
 
 
@@ -2041,12 +2218,15 @@ async function runScan({
                     uniqueUrls.length > 0
 
                         ? Math.round(
+
                             50 +
+
                             (
                                 linksValidated /
                                 uniqueUrls.length
                             ) *
                             50
+
                         )
 
                         : 100;
@@ -2079,14 +2259,18 @@ async function runScan({
                         linksValidated,
 
                         percent
+
                     });
+
                 }
 
 
                 return result;
+
             },
 
             6
+
         );
 
 
@@ -2096,33 +2280,45 @@ async function runScan({
 
         const results =
             discovered.map(
+
                 item => ({
 
                     ...item,
 
-                    ...(validationMap.get(
-                        item.targetUrl
-                    ) || {
+                    ...(
 
-                        statusCode:
-                            0,
+                        validationMap.get(
+                            item.targetUrl
+                        )
 
-                        validationStatus:
-                            "unable_to_validate",
+                        ||
 
-                        validationMethod:
-                            "HTTP + Browser",
+                        {
 
-                        finalUrl:
-                            item.targetUrl,
+                            statusCode:
+                                0,
 
-                        responseTimeMs:
-                            0,
+                            validationStatus:
+                                "unable_to_validate",
 
-                        errorMessage:
-                            "No validation result available"
-                    })
+                            validationMethod:
+                                "HTTP + Browser",
+
+                            finalUrl:
+                                item.targetUrl,
+
+                            responseTimeMs:
+                                0,
+
+                            errorMessage:
+                                "No validation result available"
+
+                        }
+
+                    )
+
                 })
+
             );
 
 
@@ -2139,9 +2335,12 @@ async function runScan({
                 pages.length,
 
             pagesWithErrors:
+
                 pages.filter(
+
                     page =>
                         page.pageError
+
                 ).length,
 
             linksDiscovered:
@@ -2151,60 +2350,93 @@ async function runScan({
                 uniqueUrls.length,
 
             valid:
+
                 results.filter(
+
                     result =>
+
                         result.validationStatus ===
                         "valid"
+
                 ).length,
 
             redirects:
+
                 results.filter(
+
                     result =>
+
                         result.validationStatus ===
                         "redirect"
+
                 ).length,
 
             broken:
+
                 results.filter(
+
                     result =>
+
                         result.validationStatus ===
                         "broken"
+
                 ).length,
 
             accessRestricted:
+
                 results.filter(
+
                     result =>
+
                         result.validationStatus ===
                         "access_restricted"
+
                 ).length,
 
             serverErrors:
+
                 results.filter(
+
                     result =>
+
                         result.validationStatus ===
                         "server_error"
+
                 ).length,
 
             unableToValidate:
+
                 results.filter(
+
                     result =>
+
                         result.validationStatus ===
                         "unable_to_validate"
+
                 ).length,
 
             internalLinks:
+
                 results.filter(
+
                     result =>
+
                         result.linkType ===
                         "Internal"
+
                 ).length,
 
             externalLinks:
+
                 results.filter(
+
                     result =>
+
                         result.linkType ===
                         "External"
+
                 ).length
+
         };
 
 
@@ -2236,27 +2468,39 @@ async function runScan({
 
                 percent:
                     100
+
             });
+
         }
 
 
         console.log("");
 
+
         console.log(
             "========================================"
         );
+
 
         console.log(
             "SCAN COMPLETED"
         );
 
+
         console.log(
+
             JSON.stringify(
+
                 summary,
+
                 null,
+
                 2
+
             )
+
         );
+
 
         console.log(
             "========================================"
@@ -2276,12 +2520,16 @@ async function runScan({
             summary,
 
             pageErrors:
+
                 pages.filter(
+
                     page =>
                         page.pageError
+
                 ),
 
             results
+
         };
 
 
@@ -2293,7 +2541,9 @@ async function runScan({
         console.log(
             "Chromium browser closed."
         );
+
     }
+
 }
 
 
